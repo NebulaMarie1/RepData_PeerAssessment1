@@ -1,25 +1,133 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Course Project 1"
+output: html_document
+date: "2026-04-23"
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width = 7, fig.height = 5)
+```
 
-## Loading and preprocessing the data
+Loading and preprocessing the data
+```{r}
+# Set working directory if needed, then:
+activity <- read.csv("~/Coursera/activity.csv")
+
+# Convert date to Date class
+activity$date <- as.Date(activity$date)
+
+str(activity)
+summary(activity)
+```
+
+What is mean total number of steps taken per day?
+```{r}
+library(dplyr)
+
+steps_per_day <- activity %>%
+  group_by(date) %>%
+  summarize(total_steps = sum(steps, na.rm = TRUE))
+
+# Histogram
+hist(steps_per_day$total_steps,
+     main = "Total Steps per Day",
+     xlab = "Steps",
+     col = "steelblue")
+```
 
 
+```{r}
+mean_steps   <- mean(steps_per_day$total_steps)
+median_steps <- median(steps_per_day$total_steps)
 
-## What is mean total number of steps taken per day?
+mean_steps
+median_steps
+```
+
+What is the average daily activity pattern?
+```{r}
+steps_by_interval <- activity %>%
+  group_by(interval) %>%
+  summarize(avg_steps = mean(steps, na.rm = TRUE))
+
+plot(steps_by_interval$interval,
+     steps_by_interval$avg_steps,
+     type = "l",
+     xlab = "5-minute interval",
+     ylab = "Average number of steps",
+     main = "Average Daily Activity Pattern")
+
+```
+
+```{r}
+max_interval <- steps_by_interval$interval[which.max(steps_by_interval$avg_steps)]
+max_interval
+
+```
+Imputing Missing Values
+```{r}
+total_na <- sum(is.na(activity$steps))
+total_na
+
+# Simple strategy: replace NA with mean for that interval
+
+# Join interval means
+activity_impute <- activity %>%
+  left_join(steps_by_interval, by = "interval")
+
+# Replace NA steps with avg_steps
+activity_impute$steps[is.na(activity_impute$steps)] <-
+  activity_impute$avg_steps[is.na(activity_impute$steps)]
+
+# Check
+sum(is.na(activity_impute$steps))
+
+```
+
+```{r}
+steps_per_day_imp <- activity_impute %>%
+  group_by(date) %>%
+  summarize(total_steps = sum(steps))
+
+hist(steps_per_day_imp$total_steps,
+     main = "Total Steps per Day (Imputed)",
+     xlab = "Steps",
+     col = "darkgreen")
+```
+
+```{r}
+mean_steps_imp   <- mean(steps_per_day_imp$total_steps)
+median_steps_imp <- median(steps_per_day_imp$total_steps)
+
+mean_steps_imp
+median_steps_imp
+
+# You can compare:
+mean_steps; median_steps
+```
 
 
+Are there differences in activity patterns between weekdays and weekends?
+```{r}
+activity_impute$day_type <- ifelse(weekdays(activity_impute$date) %in% c("Saturday", "Sunday"),
+                                   "weekend", "weekday")
+activity_impute$day_type <- factor(activity_impute$day_type,
+                                   levels = c("weekday", "weekend"))
 
-## What is the average daily activity pattern?
+steps_interval_daytype <- activity_impute %>%
+  group_by(interval, day_type) %>%
+  summarize(avg_steps = mean(steps), .groups = "drop")
 
+```
 
+```{r}
+library(lattice)
 
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+xyplot(avg_steps ~ interval | day_type,
+       data = steps_interval_daytype,
+       type = "l",
+       layout = c(1, 2),
+       xlab = "5-minute interval",
+       ylab = "Average number of steps",
+       main = "Weekday vs Weekend Activity Patterns")
+```
